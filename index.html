@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>家族の予定＆ご飯管理</title>
+  <style>
+    body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 10px; }
+    h1 { text-align: center; color: #2c3e50; margin: 10px 0; font-size: 20px; }
+    .container { max-width: 1000px; margin: 0 auto; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .period-selector { text-align: center; margin-bottom: 10px; }
+    .btn { background-color: #ecf0f1; border: 1px solid #bdc3c7; padding: 6px 12px; margin: 0 3px; cursor: pointer; border-radius: 4px; font-weight: bold; font-size: 13px; }
+    .btn.active { background-color: #3498db; color: white; border-color: #2980b9; }
+    table { width: 100%; border-collapse: collapse; margin-top: 5px; table-layout: fixed; }
+    th, td { border: 1px solid #ddd; padding: 6px 4px; text-align: center; font-size: 13px; }
+    th { background-color: #34495e; color: white; font-weight: bold; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    th.col-date, td.date-col { width: 18%; }
+    th.col-memo, td.memo-col { width: 30%; }
+    th.col-user, td.user-col { width: 13%; }
+    .date-col { font-weight: bold; background-color: #eaeded; font-size: 12px; line-height: 1.3; }
+    .sat { color: #2980b9; }
+    .sun { color: #c0392b; }
+    .memo-textarea { width: 92%; height: 45px; padding: 4px; border: 1px solid #ccc; border-radius: 4px; resize: none; font-size: 12px; font-family: inherit; box-sizing: border-box; }
+    .meal-container { display: flex; justify-content: space-between; gap: 2px; }
+    select { width: 48%; padding: 4px 1px; border-radius: 4px; border: 1px solid #ccc; background-color: #fff; cursor: pointer; font-weight: bold; font-size: 11px; text-align: center; }
+    select.val-要 { background-color: #ffeb3b; color: #000; }
+    select.val-不要 { background-color: #e0e0e0; color: #757575; }
+    select.val-ー { background-color: #ffffff; color: #333; }
+    .status { text-align: center; color: #27ae60; font-weight: bold; height: 18px; margin-top: 5px; font-size: 13px; }
+    @media (max-width: 480px) { 
+      body { padding: 2px; } .container { padding: 5px; } th, td { padding: 4px 2px; font-size: 11px; }
+      .date-col { font-size: 10px; } .memo-textarea { font-size: 11px; height: 42px; } select { font-size: 10px; padding: 4px 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏡 家族の予定＆ご飯マネージャー</h1>
+    <div class="period-selector">
+      <button id="btn-7" class="btn active" onclick="changePeriod(7)">1週間分</button>
+      <button id="btn-14" class="btn" onclick="changePeriod(14)">2週間分</button>
+      <button id="btn-30" class="btn" onclick="changePeriod(30)">1ヶ月分</button>
+    </div>
+    <div id="status" class="status">データを読み込み中...</div>
+    <table>
+      <thead>
+        <tr>
+          <th class="col-date">日付</th> <th class="col-memo">メモ</th>
+          <th class="col-user">kou<br><span style="font-size:10px; font-weight:normal;">昼 / 夜</span></th>
+          <th class="col-user">chi<br><span style="font-size:10px; font-weight:normal;">昼 / 夜</span></th>
+          <th class="col-user">mar<br><span style="font-size:10px; font-weight:normal;">昼 / 夜</span></th>
+          <th class="col-user">yur<br><span style="font-size:10px; font-weight:normal;">昼 / 夜</span></th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+
+  <script>
+    // 新しいウェブアプリURLを埋め込みました
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbz3IqEa0AaSpxgmwiVSFwVXHQkBT5vuDTlVT62D5BZIDVhjITGO9W4vNZOZMswOskjoAg/exec";
+
+    let currentDays = 7;
+    window.onload = function() { loadData(); };
+
+    function changePeriod(days) {
+      currentDays = days;
+      document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('btn-' + days).classList.add('active');
+      loadData();
+    }
+
+    // データを読み込む関数
+    function loadData() {
+      document.getElementById('status').innerText = 'データを読み込み中...';
+      
+      fetch(GAS_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "get", days: currentDays })
+      })
+      .then(res => res.json())
+      .then(response => {
+        if(response.success) { renderTable(response.data); } else { showError(response.error); }
+      })
+      .catch(showError);
+    }
+
+    // 表を描画する関数
+    function renderTable(data) {
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+      data.forEach(row => {
+        const tr = document.createElement('tr');
+        let dayClass = row.day === '土' ? 'sat' : (row.day === '日' ? 'sun' : '');
+        const shortDate = row.date.substring(5).replace('-', '/');
+        
+        tr.innerHTML = `
+          <td class="date-col ${dayClass}">${shortDate}<br>(${row.day})</td>
+          <td class="memo-col"><textarea class="memo-textarea" onchange="updateData('${row.date}', 'イベント', this.value)">${row.event}</textarea></td>
+          <td class="user-col"><div class="meal-container">${createSelect(row.date, 'kou_昼', row.kou_lunch)}${createSelect(row.date, 'kou_夜', row.kou_dinner)}</div></td>
+          <td class="user-col"><div class="meal-container">${createSelect(row.date, 'chi_昼', row.chi_lunch)}${createSelect(row.date, 'chi_夜', row.chi_dinner)}</div></td>
+          <td class="user-col"><div class="meal-container">${createSelect(row.date, 'mar_昼', row.mar_lunch)}${createSelect(row.date, 'mar_夜', row.mar_dinner)}</div></td>
+          <td class="user-col"><div class="meal-container">${createSelect(row.date, 'yur_昼', row.yur_lunch)}${createSelect(row.date, 'yur_夜', row.yur_dinner)}</div></td>
+        `;
+        tbody.appendChild(tr);
+      });
+      document.getElementById('status').innerText = '最新の状態です';
+    }
+
+    function createSelect(date, colName, currentValue) {
+      return `
+        <select class="val-${currentValue}" onchange="updateData('${date}', '${colName}', this.value); updateSelectColor(this);">
+          <option value="ー" ${currentValue === 'ー' ? 'selected' : ''}>ー</option>
+          <option value="要" ${currentValue === '要' ? 'selected' : ''}>要</option>
+          <option value="不要" ${currentValue === '不要' ? 'selected' : ''}>不要</option>
+        </select>
+      `;
+    }
+
+    function updateSelectColor(selectEl) { selectEl.className = 'val-' + selectEl.value; }
+
+    // データを更新する関数
+    function updateData(date, colName, value) {
+      document.getElementById('status').innerText = '保存中...';
+      
+      fetch(GAS_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "update", date: date, colName: colName, value: value })
+      })
+      .then(res => res.json())
+      .then(response => {
+        if(response.success) {
+          document.getElementById('status').innerText = '保存しました！';
+          setTimeout(() => { document.getElementById('status').innerText = '最新の状態です'; }, 2000);
+        } else { showError(response.error); }
+      })
+      .catch(showError);
+    }
+
+    function showError(err) { document.getElementById('status').innerText = 'エラーが発生しました'; console.error(err); }
+  </script>
+</body>
+</html>
